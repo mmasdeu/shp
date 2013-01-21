@@ -287,7 +287,7 @@ def find_tau0_and_gtau(v0,M,W,orientation = None,algorithm = 'guitart_masdeu'):
         for tau0,gtau_orig in emblist[:2]:
             while len(list_embeddings) == 0:
                 gtau = gtau_orig
-                verbose('gtau[0,0] = %s'%gtau[0,0])
+                verbose('gtau = %s'%gtau)
                 ## First try
                 for u1 in is_represented_by_unit(M,ZZ(gtau[0,0]),p):
                     u_M1 = matrix(QQ,2,2,[u1^-1,0,0,u1])
@@ -504,11 +504,12 @@ def find_limits(tau,gtau = None,level = 1,v0 = None,method = 2):
            if b == 1:
                return find_limits(tau-a/b,M2Z([0,-1,1,0]), level = 1)
            else:
-             d = (1/(Zmod(b)(a))).lift()
-             if 2*d > b : d -= b
-             c = ZZ((a*d-1)/b)
-             a,b,c,d = a,b,c,d if d >= 0 else -a,-b,-c,-d
-             return find_limits((b*tau-a)/(d*tau-c),M2Z([0,-1,1,0]),level = 1) + find_limits(tau,M2Z([-c,a,-d,b]),level = 1)
+               d = (1/(Zmod(b)(a))).lift()
+               if 2*d > b : d -= b
+               c = ZZ((a*d-1)/b)
+               if d < 0:
+                   a,b,c,d = -a,-b,-c,-d
+               return find_limits((b*tau-a)/(d*tau-c),M2Z([0,-1,1,0]),level = 1) + find_limits(tau,M2Z([-c,a,-d,b]),level = 1)
     else:
         if tau.parent().is_exact():
             p = v0.codomain().prime()
@@ -574,7 +575,7 @@ def get_limits_from_decomp(tau,dec,v0):
                 t2 = v0(newTau)
             else:
                 t1 = oldTau
-                t2 = oldTau
+                t2 = newTau
             V.append([t1,t2])
             n_evals += num_evals(t1,t2)
         oldTau = newTau
@@ -660,6 +661,63 @@ def stark_heegner_points(Phi,E,D,QQp,algorithm = 'guitart_masdeu', idx_orientati
       return candidate,Jlist,emblist
 
 
+
+def double_integral_zero_infty_riemann(Phi,tau1,tau2,E):
+    p = Phi.elliptic_curve().conductor()
+    K = tau1.parent()
+    R = PolynomialRing(K,'x')
+    x = R.gen()
+
+    level = p
+    predicted_evals = len(E)
+
+    resmul = 1
+    total_evals = 0
+    percentage = QQ(0)
+    ii = 0
+    f = (x-tau2)/(x-tau1)
+    for e in E:
+        ii += 1
+        increment = QQ((100-percentage)/len(E))
+        if total_evals % 100 == 0:
+            verbose('remaining %s percent'%(RealField(10)(100-percentage)))
+        a,b,c,d = e.list()
+        if d == 0:
+            continue
+        val = f(b/d)
+        mu_e0 = ZZ(4*Phi(M2Z([b,d,a,c])*Cusp(Infinity)) - 4*Phi(M2Z([b,d,a,c])*Cusp(0)))
+        resmul *= val**mu_e0
+        percentage += increment
+        total_evals += 1
+    verbose('total evaluations = %s'%total_evals)
+    return resmul
+
+def double_integral_riemann(Phi,tau1,tau2,r,s,E):
+   if r == [0,0] or s == [0,0]:
+       raise ValueError,'r and s must be valid projective coordinates.'
+   if r[0] == 0 and s[1] == 0: # From 0 to infinity
+       return double_integral_zero_infty_riemann(Phi,tau1,tau2,E)
+   elif s[1] == 0:
+       a,b = r
+       if b < 0: a,b = -a,-b
+       if b == 0: return 1
+       if b == 1:
+         return double_integral_riemann(Phi,tau1-a/b,tau2-a/b,[0,1],[1,0],E)
+       else:
+         d = (1/(Zmod(b)(a))).lift()
+         if 2*d > b : d -= b
+         c = ZZ((a*d-1)/b)
+
+         rr = [c,d] if d >= 0 else [-c,-d]
+         i1 = double_integral_riemann(Phi,(b*tau1-a)/(d*tau1-c),(b*tau2-a)/(d*tau2-c),[0,1],[1,0],E)
+         i2 = double_integral_riemann(Phi,tau1,tau2,rr,[1,0],E)
+         return i1*i2
+   else:
+      i1= double_integral_riemann(Phi,tau1,tau2,r,[1,0],E)
+      i2 = double_integral_riemann(Phi,tau1,tau2,s,[1,0],E)
+      return i1/i2
+
+
 def double_integral_zero_infty(Phi,tau1,tau2):
     p = Phi.parent().prime()
     K = tau1.parent()
@@ -719,6 +777,7 @@ def double_integral_zero_infty(Phi,tau1,tau2):
     val = resmul.valuation()
     return p**val*K.teichmuller(p**(-val)*resmul)*resadd.exp()
 
+
 ##----------------------------------------------------------------------------
 ##  double_integral(tau1,tau2,r,s)
 ##  
@@ -742,7 +801,7 @@ def double_integral(Phi,tau1,tau2,r,s):
    elif s[1] == 0:
        a,b = r
        if b < 0: a,b = -a,-b
-       if b == 0: return 0
+       if b == 0: return 1
        if b == 1:
          return double_integral(Phi,tau1-a/b,tau2-a/b,[0,1],[1,0])
        else:
@@ -780,8 +839,14 @@ def indef_integral(Phi,tau,r,s  = None,limits = None):
     level = ZZ(Phi._map._manin.level()/p)
     I = 1
     if limits is None:
-        Vr = find_limits(tau,r,level)
-        Vs = find_limits(tau,s,level)
+        g,y,mx = xgcd(r[0],r[1])
+        gtau = matrix(ZZ,2,2,[r[0],-mx/g,r[1],y/g])
+        assert gtau.determinant() == 1
+        Vr = find_limits(tau,gtau,level)
+        g,y,mx = xgcd(s[0],s[1])
+        gtau = matrix(ZZ,2,2,[s[0],-mx/g,s[1],y/g])
+        assert gtau.determinant() == 1
+        Vs = find_limits(tau,gtau,level)
     else:
         assert s is None
         Vr = limits
