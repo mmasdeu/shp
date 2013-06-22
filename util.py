@@ -184,10 +184,10 @@ def recognize_point(x,y,EF,prec = None):
   elif (1/x).valuation() > prec and (1/y).valuation() > prec:
       candidate = [0,1,0]
   else:
-      x1 = p**(x.valuation())*QQp(ZZ(x._ntl_rep()[0])) + O(p^prec)
-      x2 = p**(x.valuation())*QQp(ZZ(x._ntl_rep()[1])) + O(p^prec)
-      y1 = p**(y.valuation())*QQp(ZZ(y._ntl_rep()[0])) + O(p^prec)
-      y2 = p**(y.valuation())*QQp(ZZ(y._ntl_rep()[1])) + O(p^prec)
+      x1 = (p**(x.valuation())*QQp(ZZ(x._ntl_rep()[0]))).add_bigoh(prec)
+      x2 = (p**(x.valuation())*QQp(ZZ(x._ntl_rep()[1]))).add_bigoh(prec)
+      y1 = (p**(y.valuation())*QQp(ZZ(y._ntl_rep()[0]))).add_bigoh(prec)
+      y2 = (p**(y.valuation())*QQp(ZZ(y._ntl_rep()[1]))).add_bigoh(prec)
       try:
           x1 = algdep(x1,1).roots(QQ)[0][0]
           x2 = algdep(x2,1).roots(QQ)[0][0]

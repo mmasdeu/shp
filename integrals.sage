@@ -5,7 +5,7 @@ from sage.modular.pollack_stevens.space import ps_modsym_from_elliptic_curve
 from functools import wraps
 import os.path
 import gc,errno,signal,os,types
-from util.py import *
+from util import *
 
 ########################################################################################
 # First some auxiliary functions
