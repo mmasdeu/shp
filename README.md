@@ -1,8 +1,5 @@
 shp
 ===
 
-Stark-Heegner points on elliptic curves with (almost) arbitrary conductor.
+All the functionality of this package is now included in the more advanced *darmonpoints* package, which can be found at https://github.com/mmasdeu/darmonpoints/. Please use that package instead.
 
-Requires: Sage, patched with OMS package (available at https://github.com/haikona/OMS).
-
-Please see example.sage for the typical automated usage.
